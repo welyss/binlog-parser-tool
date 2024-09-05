@@ -29,46 +29,57 @@
 			<version>1.9.0</version>
 		</dependency>
 	</dependencies>
-    <build>
-        <plugins>
-            <plugin><!-- 配置java编译版本, 会影响eclipse的buildpath的jdk版本 -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.12.1</version>
-                <configuration>
-<!--                    <source>21</source>
+	<build>
+		<plugins>
+			<plugin><!-- 配置java编译版本, 会影响eclipse的buildpath的jdk版本 -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<version>3.12.1</version>
+				<configuration>
+					<!--                    <source>21</source>
                     <target>21</target>-->
-                    <source>1.8</source>
-                    <target>1.8</target>
-                </configuration>
-            </plugin>
-            <plugin><!-- 打包生成可执行文件 -->
-                <groupId>org.codehaus.mojo</groupId>
-                <artifactId>appassembler-maven-plugin</artifactId>
-                <version>1.10</version>
+					<source>1.8</source>
+					<target>1.8</target>
+				</configuration>
+			</plugin>
+			<plugin><!-- 配置mvn package时在target目录如何生成jar包, 排除配置文件 -->
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-jar-plugin</artifactId>
+				<version>3.3.0</version>
                 <configuration>
-                    <copyConfigurationDirectory>false</copyConfigurationDirectory>
-                    <includeConfigurationDirectoryInClasspath>false</includeConfigurationDirectoryInClasspath>
-                    <assembleDirectory>${project.build.directory}/${project.artifactId}</assembleDirectory>
-                    <extraJvmArguments>--add-opens java.base/java.lang=ALL-UNNAMED</extraJvmArguments>
-                    <binFileExtensions>
-                        <unix>.sh</unix>
-                    </binFileExtensions>
-                    <platforms>
-                        <platform>unix</platform>
-                    </platforms>
-                    <repositoryName>lib</repositoryName>
-                    <repositoryLayout>flat</repositoryLayout>
-                    <preAssembleDirectory>${basedir}/WebResources/</preAssembleDirectory>
-                    <programs>
-                        <program>
-                            <id>binlogparser</id>
-                            <mainClass>org.welyss.binlog.parser.BinlogExecutor</mainClass>
-                        </program>
-                    </programs>
-                    <useWildcardClassPath>true</useWildcardClassPath>
+					<archive>
+						<manifest>
+							<mainClass>org.welyss.binlog.parser.BinlogExecutor</mainClass>
+							<addClasspath>true</addClasspath>
+							<classpathPrefix>lib</classpathPrefix>
+							<useUniqueVersions>false</useUniqueVersions>
+						</manifest>
+					</archive>
+                    <!--<excludes>
+                        <exclude>configs/**</exclude>
+                        <exclude>logback.xml</exclude>
+                    </excludes>-->
                 </configuration>
-            </plugin>
-        </plugins>
-    </build>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-dependency-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>copy-dependencies</id>
+						<phase>prepare-package</phase>
+						<goals>
+							<goal>copy-dependencies</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.directory}/lib</outputDirectory>
+							<overWriteReleases>false</overWriteReleases>
+							<overWriteSnapshots>true</overWriteSnapshots>
+							<overWriteIfNewer>true</overWriteIfNewer>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
 </project>
