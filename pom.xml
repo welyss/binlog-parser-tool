@@ -42,24 +42,30 @@
 					<target>1.8</target>
 				</configuration>
 			</plugin>
-			<plugin><!-- 配置mvn package时在target目录如何生成jar包, 排除配置文件 -->
+			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-jar-plugin</artifactId>
+				<artifactId>maven-assembly-plugin</artifactId>
 				<version>3.3.0</version>
-                <configuration>
+				<configuration>
 					<archive>
-						<manifest>
-							<mainClass>org.welyss.binlog.parser.BinlogExecutor</mainClass>
-							<addClasspath>true</addClasspath>
-							<classpathPrefix>lib</classpathPrefix>
-							<useUniqueVersions>false</useUniqueVersions>
-						</manifest>
+						<!-- Specify the main class to be used for execution -->
+						<manifestEntries>
+							<Main-Class>org.welyss.binlog.parser.BinlogExecutor</Main-Class>
+						</manifestEntries>
 					</archive>
-                    <!--<excludes>
-                        <exclude>configs/**</exclude>
-                        <exclude>logback.xml</exclude>
-                    </excludes>-->
-                </configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+				</configuration>
+				<executions>
+					<execution>
+						<id>make-assembly</id>
+						<phase>package</phase>
+						<goals>
+							<goal>single</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
