@@ -4,6 +4,7 @@ import java.io.Console;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
+import java.io.UnsupportedEncodingException;
 import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -37,8 +38,10 @@ import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 
 public class BinlogExecutor {
 	public static final String DATE_FORMAT_SIMPLE_TIMESTAMP = "yyyy-MM-dd HH:mm:ss";
+	public static final String DATE_FORMAT_SIMPLE_TIMESTAMP_MILLI = "yyyy-MM-dd HH:mm:ss.SSS";
 	public static final Logger logger = LogManager.getLogger();
-	public static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern(DATE_FORMAT_SIMPLE_TIMESTAMP);
+	private static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern(DATE_FORMAT_SIMPLE_TIMESTAMP);
+//	private static final DateTimeFormatter dtfm = DateTimeFormatter.ofPattern(DATE_FORMAT_SIMPLE_TIMESTAMP_MILLI);
 
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) {
@@ -47,7 +50,7 @@ public class BinlogExecutor {
 		options.addOption(databaseOpt);
 		Option tableOpt = new Option("t", "table", true, "Filter: Table name");
 		options.addOption(tableOpt);
-		Option whereOpt = new Option("w", "where", true, "Filter: Condition in where for filtering data, Format: @column_index=value, Sample: @1=100");
+		Option whereOpt = new Option("w", "where", true, "Filter: Condition in where for filtering data, Format: @column_index=value, For example: @1=100");
 		options.addOption(whereOpt);
 		Option startBinlogPositionOpt = new Option("j", "start-position", true, "Start reading the binlog at position <arg>");
 		options.addOption(startBinlogPositionOpt);
@@ -71,6 +74,8 @@ public class BinlogExecutor {
 		options.addOption(startDatetimeOpt);
 		Option stopDatetimeOpt = new Option("n", "stop-datetime", true, "Stop reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -n \"2004-12-25 11:25:56\"");
 		options.addOption(stopDatetimeOpt);
+		Option charsetOpt = new Option("c", "charset", true, "Set character set for String.");
+		options.addOption(charsetOpt);
 		CommandLineParser parser = new DefaultParser();
 		CommandLine cmd;
 		try {
@@ -97,6 +102,9 @@ public class BinlogExecutor {
 					if (cmd.getArgs() != null && cmd.getArgs().length > 0) {
 						String binlogFile = cmd.getArgs()[0];
 						EventDeserializer eventDeserializer = new EventDeserializer();
+						eventDeserializer.setCompatibilityMode(
+//								EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
+								EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY);// do not directly turn to String with system default character set, use original byte array.
 						Map<Long, TableMapEventData> tableMapEventByTableId;
 						Field field;
 						try {
@@ -120,6 +128,7 @@ public class BinlogExecutor {
 							stopDatetime = LocalDateTime.parse(stopDatetimeStr, dtf).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
 						} catch (Exception e) {}
 						final long finalStopDatetime = stopDatetime;
+						String charset = cmd.getOptionValue(charsetOpt, "UTF-8");
 						String host = cmd.getOptionValue(hostOpt);
 						if (host != null && host.trim().length() > 0) {
 							int port = Integer.parseInt(cmd.getOptionValue(portOpt, "3306"));
@@ -141,10 +150,6 @@ public class BinlogExecutor {
 								password = cmd.getOptionValue(passwordOpt);
 							}
 							BinaryLogClient binlogClient = new BinaryLogClient(host, port, user, password);
-//							eventDeserializer.setCompatibilityMode(
-//							    EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
-//							    EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY
-//							);
 							binlogClient.setEventDeserializer(eventDeserializer);
 							long serverID = Integer.parseInt(String.valueOf(System.currentTimeMillis()).substring(5, 13));
 							binlogClient.setServerId(serverID);
@@ -153,7 +158,7 @@ public class BinlogExecutor {
 							binlogClient.registerEventListener(new EventListener() {
 								@Override
 							    public void onEvent(Event event) {
-									processInsertUpdateDelete(event, tableMapEventByTableId, finalStartPos, finalStopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition);
+									processInsertUpdateDelete(event, tableMapEventByTableId, finalStartPos, finalStopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition, charset);
 								}
 							});
 							try {
@@ -162,15 +167,12 @@ public class BinlogExecutor {
 								System.out.println(e.getMessage());
 							}
 						} else {
-//							eventDeserializer.setCompatibilityMode(
-//									EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
-//									EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY);
 							BinaryLogFileReader reader;
 							try {
 								reader = new BinaryLogFileReader(new File(binlogFile), eventDeserializer);
 								try {
 									for (Event event; (event = reader.readEvent()) != null;) {
-										if (processInsertUpdateDelete(event, tableMapEventByTableId, startPos, stopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition)) {
+										if (processInsertUpdateDelete(event, tableMapEventByTableId, startPos, stopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition, charset)) {
 											break;
 										}
 									}
@@ -196,11 +198,15 @@ public class BinlogExecutor {
 		}
 	}
 
-	private static Object convertVal(Object val) {
+	private static Object convertVal(Object val, String charset) {
 		Object result = null;
 		if (val != null) {
 			if (val instanceof byte[]) {
-				result = new String((byte[]) val);
+				try {
+					result = new String((byte[]) val, charset);
+				} catch (UnsupportedEncodingException e) {
+					result = new String((byte[]) val);
+				}
 			} else {
 				result = val;
 			}
@@ -214,6 +220,9 @@ public class BinlogExecutor {
 			result = null;
 		} else {
 			if (val instanceof String || val instanceof Date) {
+				if (val instanceof Date) {
+					val = dtf.format(((Date)val).toInstant().atZone(ZoneId.systemDefault()));
+				}
 				result = "'" + val + "'";
 			} else {
 				result = val.toString();
@@ -229,7 +238,7 @@ public class BinlogExecutor {
 	}
 
 	private static boolean processInsertUpdateDelete(Event event, Map<Long, TableMapEventData> tableMapEventByTableId, long startPos
-			, long stopPos, long startDatetime, long stopDatetime, String databaseFilter, String tableFilter, String whereFilter, boolean showPosition) {
+			, long stopPos, long startDatetime, long stopDatetime, String databaseFilter, String tableFilter, String whereFilter, boolean showPosition, String charset) {
 		boolean result = false;
 		EventHeaderV4 eh = (EventHeaderV4) event.getHeader();
 		if (eh.getPosition() > stopPos) {
@@ -298,8 +307,8 @@ public class BinlogExecutor {
 							Serializable[] before = pair.getKey();
 							Serializable[] after = pair.getValue();
 							for (int i = 0; i < before.length; i++) {
-								Object beforeVal = convertVal(before[i]);
-								Object afterVal = convertVal(after[i]);
+								Object beforeVal = convertVal(before[i], charset);
+								Object afterVal = convertVal(after[i], charset);
 								if (i + 1 == whereColIndex) {
 									if (beforeVal != null
 											&& !beforeVal.toString().equals(value)) {
@@ -338,7 +347,7 @@ public class BinlogExecutor {
 							sb.append("INSERT INTO `").append(database).append("`.`")
 									.append(table).append("` VALUES(");
 							for (int i = 0; i < row.length; i++) {
-								Object item = convertVal(row[i]);
+								Object item = convertVal(row[i], charset);
 								if (i + 1 == whereColIndex) {
 									if (item != null
 											&& !item.toString().equals(value)) {
@@ -370,7 +379,7 @@ public class BinlogExecutor {
 							sb.append("DELETE FROM `").append(database).append("`.`")
 									.append(table).append("` WHERE ");
 							for (int i = 0; i < row.length; i++) {
-								Object item = convertVal(row[i]);
+								Object item = convertVal(row[i], charset);
 								if (i + 1 == whereColIndex) {
 									if (item != null
 											&& !item.toString().equals(value)) {
