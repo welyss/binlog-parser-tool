@@ -5,6 +5,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.lang.reflect.Field;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -33,7 +36,9 @@ import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.deserialization.EventDeserializer;
 
 public class BinlogExecutor {
+	public static final String DATE_FORMAT_SIMPLE_TIMESTAMP = "yyyy-MM-dd HH:mm:ss";
 	public static final Logger logger = LogManager.getLogger();
+	public static final DateTimeFormatter dtf = DateTimeFormatter.ofPattern(DATE_FORMAT_SIMPLE_TIMESTAMP);
 
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) {
@@ -62,6 +67,10 @@ public class BinlogExecutor {
 		options.addOption(passwordOpt);
 		Option askPassOpt = new Option("a", "ask-pass", false, "Prompt for a password when connecting to MySQL");
 		options.addOption(askPassOpt);
+		Option startDatetimeOpt = new Option("m", "start-datetime", true, "Start reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -m \"2004-12-25 11:25:56\"");
+		options.addOption(startDatetimeOpt);
+		Option stopDatetimeOpt = new Option("n", "stop-datetime", true, "Stop reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -n \"2004-12-25 11:25:56\"");
+		options.addOption(stopDatetimeOpt);
 		CommandLineParser parser = new DefaultParser();
 		CommandLine cmd;
 		try {
@@ -99,6 +108,18 @@ public class BinlogExecutor {
 							System.out.println("Table map event by table id faild.");
 							return;
 						}
+						String startDatetimeStr = cmd.getOptionValue(startDatetimeOpt);
+						long startDatetime = Long.MIN_VALUE;
+						try {
+							startDatetime = LocalDateTime.parse(startDatetimeStr, dtf).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+						} catch (Exception e) {}
+						final long finalStartDatetime = startDatetime;
+						String stopDatetimeStr = cmd.getOptionValue(stopDatetimeOpt);
+						long stopDatetime = Long.MAX_VALUE;
+						try {
+							stopDatetime = LocalDateTime.parse(stopDatetimeStr, dtf).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
+						} catch (Exception e) {}
+						final long finalStopDatetime = stopDatetime;
 						String host = cmd.getOptionValue(hostOpt);
 						if (host != null && host.trim().length() > 0) {
 							int port = Integer.parseInt(cmd.getOptionValue(portOpt, "3306"));
@@ -132,7 +153,7 @@ public class BinlogExecutor {
 							binlogClient.registerEventListener(new EventListener() {
 								@Override
 							    public void onEvent(Event event) {
-									processInsertUpdateDelete(event, tableMapEventByTableId, finalStartPos, finalStopPos, databaseFilter, tableFilter, whereFilter, showPosition);
+									processInsertUpdateDelete(event, tableMapEventByTableId, finalStartPos, finalStopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition);
 								}
 							});
 							try {
@@ -149,7 +170,7 @@ public class BinlogExecutor {
 								reader = new BinaryLogFileReader(new File(binlogFile), eventDeserializer);
 								try {
 									for (Event event; (event = reader.readEvent()) != null;) {
-										if (processInsertUpdateDelete(event, tableMapEventByTableId, startPos, stopPos, databaseFilter, tableFilter, whereFilter, showPosition)) {
+										if (processInsertUpdateDelete(event, tableMapEventByTableId, startPos, stopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition)) {
 											break;
 										}
 									}
@@ -208,13 +229,14 @@ public class BinlogExecutor {
 	}
 
 	private static boolean processInsertUpdateDelete(Event event, Map<Long, TableMapEventData> tableMapEventByTableId, long startPos
-			, long stopPos, String databaseFilter, String tableFilter, String whereFilter, boolean showPosition) {
+			, long stopPos, long startDatetime, long stopDatetime, String databaseFilter, String tableFilter, String whereFilter, boolean showPosition) {
 		boolean result = false;
 		EventHeaderV4 eh = (EventHeaderV4) event.getHeader();
 		if (eh.getPosition() > stopPos) {
 			result = true;
 		}
-		if (startPos <= eh.getPosition() && eh.getPosition() <= stopPos) {
+		if (startPos <= eh.getPosition() && eh.getPosition() <= stopPos
+				&& startDatetime <= eh.getTimestamp() && eh.getTimestamp() <= stopDatetime) {
 			EventType type = eh.getEventType();
 			if (EventType.isRowMutation(type)) {
 				long tableId;
