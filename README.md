@@ -1,5 +1,5 @@
 # binlog-parser-tool
-A tool of MySQL binlog parser for filtering insert, update, delete query, base on https://github.com/osheroff/mysql-binlog-connector-java
+A tool of MySQL binlog parser for print insert, update, delete query with variable filter, base on https://github.com/osheroff/mysql-binlog-connector-java
 ```
 Install:
 mvn clean package
