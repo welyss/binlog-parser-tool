@@ -51,7 +51,7 @@ java -jar binlog-parser-tool.jar -hlocalhost -P3307 -utest -p123123 mysql-bin.00
 # parser binlog file: D:\mysql-bin.002142 take String with GBK charset, and filter table name with 't1'
 java -jar binlog-parser-tool.jar -c GBK -t t1 D:\mysql-bin.002142
 
-# parser binlog file: D:\mysql-bin.002142 parse datetime with TimeZone: UTC
+# parser binlog file: D:\mysql-bin.002142 parse datetime with TimeZone: UTC, (Asia/Shanghai, America/New_York)
 java -Duser.timezone="UTC" -jar binlog-parser-tool.jar D:\mysql-bin.002142
 
 # parser binlog file: D:\mysql-bin.002142 filter table name with 'sbtest' and the column of index 1 value as 12001(perhaps: id=12001) and start datetime: 2024-09-06 10:00:00
