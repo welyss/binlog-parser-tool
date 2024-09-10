@@ -45,6 +45,7 @@ public class BinlogExecutor {
 
 	@SuppressWarnings("unchecked")
 	public static void main(String[] args) {
+		System.out.println("System Default ZoneId: " + ZoneId.systemDefault());
 		Options options = new Options();
 		Option databaseOpt = new Option("d", "database", true, "Filter: Database name");
 		options.addOption(databaseOpt);
@@ -76,6 +77,10 @@ public class BinlogExecutor {
 		options.addOption(stopDatetimeOpt);
 		Option charsetOpt = new Option("c", "charset", true, "Set character set for String.");
 		options.addOption(charsetOpt);
+		Option heartbeatIntervalOpt = new Option("i", "heartbeat-interval", true, "heartbeat period in milliseconds.");
+		options.addOption(heartbeatIntervalOpt);
+		Option nonBlockingOpt = new Option("b", "non-blocking", false, "non-blocking mode. If set - BinaryLogClient will disconnect after the last event.");
+		options.addOption(nonBlockingOpt);
 		CommandLineParser parser = new DefaultParser();
 		CommandLine cmd;
 		try {
@@ -150,6 +155,10 @@ public class BinlogExecutor {
 								password = cmd.getOptionValue(passwordOpt);
 							}
 							BinaryLogClient binlogClient = new BinaryLogClient(host, port, user, password);
+							boolean nonBlocking = !cmd.hasOption(nonBlockingOpt);
+							binlogClient.setBlocking(nonBlocking);
+							int heartbeatInterval = Integer.parseInt(cmd.getOptionValue(heartbeatIntervalOpt, "30000"));
+							binlogClient.setHeartbeatInterval(heartbeatInterval);
 							binlogClient.setEventDeserializer(eventDeserializer);
 							long serverID = Integer.parseInt(String.valueOf(System.currentTimeMillis()).substring(5, 13));
 							binlogClient.setServerId(serverID);
