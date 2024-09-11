@@ -71,9 +71,11 @@ public class BinlogExecutor {
 		options.addOption(passwordOpt);
 		Option askPassOpt = new Option("a", "ask-pass", false, "Prompt for a password when connecting to MySQL");
 		options.addOption(askPassOpt);
-		Option startDatetimeOpt = new Option("m", "start-datetime", true, "Start reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -m \"2004-12-25 11:25:56\"");
+		Option startDatetimeOpt = new Option("m", "start-datetime", true,
+				"Start reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -m \"2004-12-25 11:25:56\"");
 		options.addOption(startDatetimeOpt);
-		Option stopDatetimeOpt = new Option("n", "stop-datetime", true, "Stop reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -n \"2004-12-25 11:25:56\"");
+		Option stopDatetimeOpt = new Option("n", "stop-datetime", true,
+				"Stop reading the binlog at datetime <arg>, you should probably use quotes for your shell to set it properly, format: [yyyy-MM-dd HH:mm:ss], for example: -n \"2004-12-25 11:25:56\"");
 		options.addOption(stopDatetimeOpt);
 		Option charsetOpt = new Option("c", "charset", true, "Set character set for String.");
 		options.addOption(charsetOpt);
@@ -96,12 +98,14 @@ public class BinlogExecutor {
 					long startPos = 4l;
 					try {
 						startPos = Long.parseLong(cmd.getOptionValue(startBinlogPositionOpt));
-					} catch (Exception e) {}
+					} catch (Exception e) {
+					}
 					long finalStartPos = startPos;
 					long stopPos = Long.MAX_VALUE;
 					try {
 						stopPos = Long.parseLong(cmd.getOptionValue(stopBinlogPositionOpt));
-					} catch (Exception e) {}
+					} catch (Exception e) {
+					}
 					long finalStopPos = stopPos;
 					final boolean showPosition = cmd.hasOption(showPosOpt);
 					if (cmd.getArgs() != null && cmd.getArgs().length > 0) {
@@ -109,15 +113,15 @@ public class BinlogExecutor {
 						EventDeserializer eventDeserializer = new EventDeserializer();
 						eventDeserializer.setCompatibilityMode(
 //								EventDeserializer.CompatibilityMode.DATE_AND_TIME_AS_LONG,
-								EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY);// do not directly turn to String with system default character set, use original byte array.
+								EventDeserializer.CompatibilityMode.CHAR_AND_BINARY_AS_BYTE_ARRAY);// do not directly turn to String with system default character set, use
+																									// original byte array.
 						Map<Long, TableMapEventData> tableMapEventByTableId;
 						Field field;
 						try {
 							field = eventDeserializer.getClass().getDeclaredField("tableMapEventByTableId");
 							field.setAccessible(true);
 							tableMapEventByTableId = (Map<Long, TableMapEventData>) field.get(eventDeserializer);
-						} catch (NoSuchFieldException | SecurityException | IllegalArgumentException
-								| IllegalAccessException e) {
+						} catch (NoSuchFieldException | SecurityException | IllegalArgumentException | IllegalAccessException e) {
 							System.out.println("Table map event by table id faild.");
 							return;
 						}
@@ -125,13 +129,15 @@ public class BinlogExecutor {
 						long startDatetime = Long.MIN_VALUE;
 						try {
 							startDatetime = LocalDateTime.parse(startDatetimeStr, dtf).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-						} catch (Exception e) {}
+						} catch (Exception e) {
+						}
 						final long finalStartDatetime = startDatetime;
 						String stopDatetimeStr = cmd.getOptionValue(stopDatetimeOpt);
 						long stopDatetime = Long.MAX_VALUE;
 						try {
 							stopDatetime = LocalDateTime.parse(stopDatetimeStr, dtf).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
-						} catch (Exception e) {}
+						} catch (Exception e) {
+						}
 						final long finalStopDatetime = stopDatetime;
 						String charset = cmd.getOptionValue(charsetOpt, "UTF-8");
 						String host = cmd.getOptionValue(hostOpt);
@@ -142,9 +148,9 @@ public class BinlogExecutor {
 							if (cmd.hasOption(askPassOpt)) {
 								Console console = System.console();
 								if (console == null) {
-						            System.out.println("Can not input password, reason is no console available");
-						            return;
-						        }
+									System.out.println("Can not input password, reason is no console available");
+									return;
+								}
 								char[] passwordArray = console.readPassword("Enter your password: ");
 								if (passwordArray == null) {
 									password = "";
@@ -166,8 +172,9 @@ public class BinlogExecutor {
 							binlogClient.setBinlogPosition(startPos);
 							binlogClient.registerEventListener(new EventListener() {
 								@Override
-							    public void onEvent(Event event) {
-									processInsertUpdateDelete(event, tableMapEventByTableId, finalStartPos, finalStopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition, charset);
+								public void onEvent(Event event) {
+									processInsertUpdateDelete(event, tableMapEventByTableId, finalStartPos, finalStopPos, finalStartDatetime, finalStopDatetime, databaseFilter,
+											tableFilter, whereFilter, showPosition, charset);
 								}
 							});
 							try {
@@ -181,7 +188,8 @@ public class BinlogExecutor {
 								reader = new BinaryLogFileReader(new File(binlogFile), eventDeserializer);
 								try {
 									for (Event event; (event = reader.readEvent()) != null;) {
-										if (processInsertUpdateDelete(event, tableMapEventByTableId, startPos, stopPos, finalStartDatetime, finalStopDatetime, databaseFilter, tableFilter, whereFilter, showPosition, charset)) {
+										if (processInsertUpdateDelete(event, tableMapEventByTableId, startPos, stopPos, finalStartDatetime, finalStopDatetime, databaseFilter,
+												tableFilter, whereFilter, showPosition, charset)) {
 											break;
 										}
 									}
@@ -230,7 +238,7 @@ public class BinlogExecutor {
 		} else {
 			if (val instanceof String || val instanceof Date) {
 				if (val instanceof Date) {
-					val = dtf.format(((Date)val).toInstant().atZone(ZoneId.systemDefault()));
+					val = dtf.format(((Date) val).toInstant().atZone(ZoneId.systemDefault()));
 				}
 				result = "'" + val + "'";
 			} else {
@@ -242,19 +250,17 @@ public class BinlogExecutor {
 
 	private static void showHelp(Options options) {
 		HelpFormatter formatter = new HelpFormatter();
-		formatter.printHelp("binlog-parser-tool [Options] [BinlogFileName]", "Options:", options,
-				"Sample:\n  binlog-parser-tool /tmp/binlogs/mysql-bin.001130");
+		formatter.printHelp("binlog-parser-tool [Options] [BinlogFileName]", "Options:", options, "Sample:\n  binlog-parser-tool /tmp/binlogs/mysql-bin.001130");
 	}
 
-	private static boolean processInsertUpdateDelete(Event event, Map<Long, TableMapEventData> tableMapEventByTableId, long startPos
-			, long stopPos, long startDatetime, long stopDatetime, String databaseFilter, String tableFilter, String whereFilter, boolean showPosition, String charset) {
+	private static boolean processInsertUpdateDelete(Event event, Map<Long, TableMapEventData> tableMapEventByTableId, long startPos, long stopPos, long startDatetime,
+			long stopDatetime, String databaseFilter, String tableFilter, String whereFilter, boolean showPosition, String charset) {
 		boolean result = false;
 		EventHeaderV4 eh = (EventHeaderV4) event.getHeader();
 		if (eh.getPosition() > stopPos) {
 			result = true;
 		}
-		if (startPos <= eh.getPosition() && eh.getPosition() <= stopPos
-				&& startDatetime <= eh.getTimestamp() && eh.getTimestamp() <= stopDatetime) {
+		if (startPos <= eh.getPosition() && eh.getPosition() <= stopPos && startDatetime <= eh.getTimestamp() && eh.getTimestamp() <= stopDatetime) {
 			EventType type = eh.getEventType();
 			if (EventType.isRowMutation(type)) {
 				long tableId;
@@ -277,11 +283,9 @@ public class BinlogExecutor {
 				TableMapEventData tmed = tableMapEventByTableId.get(tableId);
 				String database = tmed.getDatabase();
 				String table = tmed.getTable();
-				if (databaseFilter != null && databaseFilter.trim().length() > 0
-						&& !databaseFilter.equals(database)) {
+				if (databaseFilter != null && databaseFilter.trim().length() > 0 && !databaseFilter.equals(database)) {
 					return result;
-				} else if (tableFilter != null && tableFilter.trim().length() > 0
-						&& !tableFilter.equals(table)) {
+				} else if (tableFilter != null && tableFilter.trim().length() > 0 && !tableFilter.equals(table)) {
 					return result;
 				}
 				StringBuilder sqlBuff = new StringBuilder();
@@ -302,8 +306,7 @@ public class BinlogExecutor {
 				if (EventType.isUpdate(type)) {
 					UpdateRowsEventData updateEventData = event.getData();
 					// update
-					List<Entry<Serializable[], Serializable[]>> rows = updateEventData
-							.getRows();
+					List<Entry<Serializable[], Serializable[]>> rows = updateEventData.getRows();
 					if (rows.size() > 0) {
 
 						for (int ri = 0; ri < rows.size(); ri++) {
@@ -311,24 +314,20 @@ public class BinlogExecutor {
 							boolean skip = false;
 							StringBuilder sb = new StringBuilder();
 							StringBuilder whereBuff = new StringBuilder();
-							sb.append("UPDATE `").append(database).append("`.`")
-									.append(table).append("` SET ");
+							sb.append("UPDATE `").append(database).append("`.`").append(table).append("` SET ");
 							Serializable[] before = pair.getKey();
 							Serializable[] after = pair.getValue();
 							for (int i = 0; i < before.length; i++) {
 								Object beforeVal = convertVal(before[i], charset);
 								Object afterVal = convertVal(after[i], charset);
 								if (i + 1 == whereColIndex) {
-									if (beforeVal != null
-											&& !beforeVal.toString().equals(value)) {
+									if (beforeVal != null && !beforeVal.toString().equals(value)) {
 										skip = true;
 										break;
 									}
 								}
-								sb.append("@").append(i + 1).append("=")
-										.append(formatVal(afterVal));
-								whereBuff.append("@").append(i + 1).append("=")
-										.append(formatVal(beforeVal));
+								sb.append("@").append(i + 1).append("=").append(formatVal(afterVal));
+								whereBuff.append("@").append(i + 1).append("=").append(formatVal(beforeVal));
 								if (i < before.length - 1) {
 									sb.append(",");
 									whereBuff.append(" AND ");
@@ -353,13 +352,11 @@ public class BinlogExecutor {
 							Serializable[] row = rows.get(ri);
 							boolean skip = false;
 							StringBuilder sb = new StringBuilder();
-							sb.append("INSERT INTO `").append(database).append("`.`")
-									.append(table).append("` VALUES(");
+							sb.append("INSERT INTO `").append(database).append("`.`").append(table).append("` VALUES(");
 							for (int i = 0; i < row.length; i++) {
 								Object item = convertVal(row[i], charset);
 								if (i + 1 == whereColIndex) {
-									if (item != null
-											&& !item.toString().equals(value)) {
+									if (item != null && !item.toString().equals(value)) {
 										skip = true;
 										break;
 									}
@@ -385,19 +382,16 @@ public class BinlogExecutor {
 							Serializable[] row = rows.get(ri);
 							boolean skip = false;
 							StringBuilder sb = new StringBuilder();
-							sb.append("DELETE FROM `").append(database).append("`.`")
-									.append(table).append("` WHERE ");
+							sb.append("DELETE FROM `").append(database).append("`.`").append(table).append("` WHERE ");
 							for (int i = 0; i < row.length; i++) {
 								Object item = convertVal(row[i], charset);
 								if (i + 1 == whereColIndex) {
-									if (item != null
-											&& !item.toString().equals(value)) {
+									if (item != null && !item.toString().equals(value)) {
 										skip = true;
 										break;
 									}
 								}
-								sb.append("@").append(i + 1).append("=")
-										.append(formatVal(item));
+								sb.append("@").append(i + 1).append("=").append(formatVal(item));
 								if (i < row.length - 1) {
 									sb.append(" AND");
 								}
