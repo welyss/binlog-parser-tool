@@ -31,6 +31,7 @@ import com.github.shyiko.mysql.binlog.event.DeleteRowsEventData;
 import com.github.shyiko.mysql.binlog.event.Event;
 import com.github.shyiko.mysql.binlog.event.EventHeaderV4;
 import com.github.shyiko.mysql.binlog.event.EventType;
+import com.github.shyiko.mysql.binlog.event.RotateEventData;
 import com.github.shyiko.mysql.binlog.event.TableMapEventData;
 import com.github.shyiko.mysql.binlog.event.UpdateRowsEventData;
 import com.github.shyiko.mysql.binlog.event.WriteRowsEventData;
@@ -237,8 +238,10 @@ public class BinlogExecutor {
 			result = null;
 		} else {
 			if (val instanceof String || val instanceof Date) {
-				if (val instanceof Date) {
-					val = dtf.format(((Date) val).toInstant().atZone(ZoneId.systemDefault()));
+				if (val instanceof java.sql.Date) {
+					val = dtf.format(new Date(((java.sql.Date)val).getTime()).toInstant().atZone(ZoneId.systemDefault()));
+				} else if (val instanceof java.util.Date) {
+					val = dtf.format(((Date)val).toInstant().atZone(ZoneId.systemDefault()));
 				}
 				result = "'" + val + "'";
 			} else {
@@ -413,6 +416,9 @@ public class BinlogExecutor {
 					}
 					System.out.println(sqlBuff);
 				}
+			} else if (EventType.ROTATE == type) {
+				RotateEventData re = event.getData();
+				System.out.println("==> Rotate: " + re.getBinlogFilename());
 			}
 		}
 		return result;
