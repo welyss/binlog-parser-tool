@@ -396,7 +396,7 @@ public class BinlogExecutor {
 								}
 								sb.append("@").append(i + 1).append("=").append(formatVal(item));
 								if (i < row.length - 1) {
-									sb.append(" AND");
+									sb.append(" AND ");
 								}
 							}
 							if (!skip) {
